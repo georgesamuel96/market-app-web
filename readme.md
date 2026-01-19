@@ -1,6 +1,6 @@
 # Database Dashboard
 
-A full-stack web application built with React.js and Express.js for managing a database with products, customers, and orders.
+A full-stack web application built with React.js and Supabase for managing a database with products, customers, and orders.
 
 ## Features
 
@@ -30,38 +30,38 @@ A full-stack web application built with React.js and Express.js for managing a d
 - React Router DOM (navigation)
 - Recharts (data visualization)
 - Vite (build tool)
+- Supabase JS Client
 
 ### Backend
-- Node.js
-- Express.js
-- better-sqlite3 (SQLite database)
-- CORS middleware
+- Supabase (PostgreSQL database + REST API)
 
 ## Project Structure
 
 ```
 market-app-web/
-├── backend/
-│   ├── package.json
-│   ├── server.js          # Express API server
-│   └── dashboard.db       # SQLite database (created on first run)
 ├── frontend/
 │   ├── public/
 │   ├── src/
-│   │   ├── components/
+│   │   ├── lib/
+│   │   │   └── supabase.js    # Supabase client config
 │   │   ├── pages/
 │   │   │   ├── Dashboard.jsx
 │   │   │   ├── Products.jsx
 │   │   │   ├── Customers.jsx
 │   │   │   └── Orders.jsx
 │   │   ├── services/
-│   │   │   └── api.js     # API service functions
+│   │   │   └── api.js         # Supabase API functions
 │   │   ├── App.jsx
 │   │   ├── App.css
 │   │   └── main.jsx
+│   ├── .env                   # Supabase credentials (not in git)
+│   ├── .env.example           # Example env file
 │   ├── index.html
 │   ├── package.json
 │   └── vite.config.js
+├── supabase/
+│   └── schema.sql             # Database schema & seed data
+├── backend/                   # Legacy SQLite backend (optional)
 ├── package.json
 └── .gitignore
 ```
@@ -70,67 +70,117 @@ market-app-web/
 
 ### Prerequisites
 - Node.js 18+ installed
+- A Supabase account and project
+
+### Supabase Setup
+
+1. Create a new project at [supabase.com](https://supabase.com)
+
+2. Go to **SQL Editor** in your Supabase dashboard
+
+3. Copy and run the contents of `supabase/schema.sql` to create tables and seed data
+
+4. Get your credentials from **Project Settings > API**:
+   - Project URL
+   - anon/public key
 
 ### Installation
 
-1. Install all dependencies:
+1. Clone the repository and install dependencies:
 ```bash
 npm run install:all
+# or just frontend
+cd frontend && npm install
 ```
 
-Or install separately:
+2. Configure environment variables:
 ```bash
-cd backend && npm install
-cd ../frontend && npm install
+cd frontend
+cp .env.example .env
+```
+
+3. Edit `.env` with your Supabase credentials:
+```
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-public-key
 ```
 
 ### Running the Application
 
-1. Start the backend server (Terminal 1):
-```bash
-npm run dev:backend
-# or
-cd backend && npm run dev
-```
-The API server will run on http://localhost:3001
-
-2. Start the frontend development server (Terminal 2):
+Start the frontend development server:
 ```bash
 npm run dev:frontend
 # or
 cd frontend && npm run dev
 ```
-The React app will run on http://localhost:3000
 
-3. Open your browser and navigate to http://localhost:3000
+Open http://localhost:3000 in your browser.
 
-## API Endpoints
+> **Note**: No backend server needed! The app connects directly to Supabase.
+
+## Database Schema
+
+### Products Table
+| Column | Type | Description |
+|--------|------|-------------|
+| id | BIGSERIAL | Primary key |
+| name | TEXT | Product name |
+| category | TEXT | Product category |
+| price | DECIMAL | Product price |
+| stock | INTEGER | Stock quantity |
+| created_at | TIMESTAMPTZ | Creation timestamp |
+| updated_at | TIMESTAMPTZ | Update timestamp |
+
+### Customers Table
+| Column | Type | Description |
+|--------|------|-------------|
+| id | BIGSERIAL | Primary key |
+| name | TEXT | Customer name |
+| email | TEXT | Unique email |
+| phone | TEXT | Phone number |
+| address | TEXT | Address |
+| created_at | TIMESTAMPTZ | Creation timestamp |
+
+### Orders Table
+| Column | Type | Description |
+|--------|------|-------------|
+| id | BIGSERIAL | Primary key |
+| customer_id | BIGINT | Foreign key to customers |
+| product_id | BIGINT | Foreign key to products |
+| quantity | INTEGER | Order quantity |
+| total_amount | DECIMAL | Calculated total |
+| status | TEXT | pending/shipped/completed |
+| created_at | TIMESTAMPTZ | Creation timestamp |
+
+## API Functions
+
+The `src/services/api.js` provides these functions:
 
 ### Stats
-- `GET /api/stats` - Get dashboard statistics
-- `GET /api/stats/categories` - Get category statistics
-- `GET /api/stats/orders` - Get order statistics
+- `fetchStats()` - Get dashboard statistics
+- `fetchCategoryStats()` - Get category breakdown
+- `fetchOrderStats()` - Get order status breakdown
 
 ### Products
-- `GET /api/products` - List all products (supports ?search, ?category, ?sort)
-- `GET /api/products/:id` - Get single product
-- `POST /api/products` - Create product
-- `PUT /api/products/:id` - Update product
-- `DELETE /api/products/:id` - Delete product
+- `fetchProducts(params)` - List products with search/filter/sort
+- `fetchProduct(id)` - Get single product
+- `createProduct(data)` - Create product
+- `updateProduct(id, data)` - Update product
+- `deleteProduct(id)` - Delete product
 
 ### Customers
-- `GET /api/customers` - List all customers (supports ?search)
-- `GET /api/customers/:id` - Get single customer
-- `POST /api/customers` - Create customer
-- `PUT /api/customers/:id` - Update customer
-- `DELETE /api/customers/:id` - Delete customer
+- `fetchCustomers(params)` - List customers with search
+- `fetchCustomer(id)` - Get single customer
+- `createCustomer(data)` - Create customer
+- `updateCustomer(id, data)` - Update customer
+- `deleteCustomer(id)` - Delete customer
 
 ### Orders
-- `GET /api/orders` - List all orders (supports ?status)
-- `GET /api/orders/:id` - Get single order
-- `POST /api/orders` - Create order
-- `PUT /api/orders/:id` - Update order
-- `DELETE /api/orders/:id` - Delete order
+- `fetchOrders(params)` - List orders with status filter
+- `fetchOrder(id)` - Get single order
+- `createOrder(data)` - Create order
+- `updateOrder(id, data)` - Update order
+- `deleteOrder(id)` - Delete order
 
 ## License
 
