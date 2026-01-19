@@ -5,60 +5,29 @@ const AuthContext = createContext({});
 
 export const useAuth = () => useContext(AuthContext);
 
+// Simple session storage key
+const SESSION_KEY = 'dashboard_user';
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Check active session
-    checkUser();
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        setUser(session.user);
-        await fetchUserProfile(session.user.id);
-      } else {
-        setUser(null);
-        setUserProfile(null);
-      }
-      setLoading(false);
-    });
-
-    return () => {
-      subscription?.unsubscribe();
-    };
+    // Check for existing session on mount
+    checkSession();
   }, []);
 
-  const checkUser = async () => {
+  const checkSession = () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchUserProfile(session.user.id);
+      const savedUser = sessionStorage.getItem(SESSION_KEY);
+      if (savedUser) {
+        setUser(JSON.parse(savedUser));
       }
     } catch (err) {
-      console.error('Error checking user:', err);
+      console.error('Error checking session:', err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const fetchUserProfile = async (userId) => {
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-
-      if (error) throw error;
-      setUserProfile(data);
-    } catch (err) {
-      console.error('Error fetching profile:', err);
-      setUserProfile(null);
     }
   };
 
@@ -67,35 +36,45 @@ export function AuthProvider({ children }) {
       setError(null);
       setLoading(true);
 
-      // Sign in with Supabase Auth
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) throw signInError;
-
-      // Fetch user profile to check role
-      const { data: profile, error: profileError } = await supabase
-        .from('user_profiles')
+      // Query the users table to find user by email
+      const { data: users, error: queryError } = await supabase
+        .from('users')
         .select('*')
-        .eq('id', data.user.id)
-        .single();
+        .eq('email', email)
+        .limit(1);
 
-      if (profileError) {
-        // Profile might not exist yet, sign out
-        await supabase.auth.signOut();
-        throw new Error('User profile not found. Please contact administrator.');
+      if (queryError) throw queryError;
+
+      // Check if user exists
+      if (!users || users.length === 0) {
+        throw new Error('This email is not registered. Please check your email.');
+      }
+
+      const foundUser = users[0];
+
+      // Check password (assuming you store plain text or hashed)
+      // Note: For production, you should use proper password hashing
+      if (foundUser.password !== password) {
+        throw new Error('Invalid password. Please try again.');
       }
 
       // Check if user is admin
-      if (profile.role !== 'admin') {
-        await supabase.auth.signOut();
+      if (foundUser.role !== 'admin') {
         throw new Error('This email is not registered as an admin. Access denied.');
       }
 
-      setUser(data.user);
-      setUserProfile(profile);
+      // Create session user object (without password)
+      const sessionUser = {
+        id: foundUser.id,
+        email: foundUser.email,
+        name: foundUser.name || foundUser.full_name || foundUser.username || email,
+        role: foundUser.role,
+      };
+
+      // Save to session storage
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(sessionUser));
+      setUser(sessionUser);
+
       return { success: true };
     } catch (err) {
       setError(err.message);
@@ -105,55 +84,22 @@ export function AuthProvider({ children }) {
     }
   };
 
-  const signUp = async (email, password, fullName, role = 'client') => {
-    try {
-      setError(null);
-      setLoading(true);
-
-      const { data, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            role: role,
-          },
-        },
-      });
-
-      if (signUpError) throw signUpError;
-
-      return { success: true, data };
-    } catch (err) {
-      setError(err.message);
-      return { success: false, error: err.message };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      setError(null);
-      await supabase.auth.signOut();
-      setUser(null);
-      setUserProfile(null);
-    } catch (err) {
-      setError(err.message);
-    }
+  const signOut = () => {
+    sessionStorage.removeItem(SESSION_KEY);
+    setUser(null);
+    setError(null);
   };
 
   const isAdmin = () => {
-    return userProfile?.role === 'admin';
+    return user?.role === 'admin';
   };
 
   const value = {
     user,
-    userProfile,
+    userProfile: user, // Alias for compatibility
     loading,
     error,
     signIn,
-    signUp,
     signOut,
     isAdmin,
   };
