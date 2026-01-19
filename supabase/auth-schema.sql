@@ -31,7 +31,7 @@ CREATE POLICY "Allow update for users" ON users
   FOR UPDATE USING (true) WITH CHECK (true);
 
 -- =============================================
--- FUNCTION: Verify user login with hashed password
+-- FUNCTION: Verify user login with SHA-256 hashed password
 -- This function securely verifies the password on the server
 -- =============================================
 
@@ -42,6 +42,7 @@ CREATE OR REPLACE FUNCTION verify_user_login(
 RETURNS JSON AS $$
 DECLARE
   found_user RECORD;
+  hashed_input TEXT;
   password_valid BOOLEAN;
 BEGIN
   -- Find user by email
@@ -59,9 +60,11 @@ BEGIN
     );
   END IF;
 
-  -- Verify password using crypt (for bcrypt hashed passwords)
-  -- This works with passwords hashed using bcrypt/pgcrypto
-  password_valid := found_user.password = crypt(user_password, found_user.password);
+  -- Hash the input password with SHA-256 and encode as hex
+  hashed_input := encode(digest(user_password, 'sha256'), 'hex');
+
+  -- Compare with stored hash (case-insensitive comparison)
+  password_valid := lower(found_user.password) = lower(hashed_input);
 
   IF NOT password_valid THEN
     RETURN json_build_object(
