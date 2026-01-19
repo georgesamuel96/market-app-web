@@ -36,39 +36,27 @@ export function AuthProvider({ children }) {
       setError(null);
       setLoading(true);
 
-      // Query the users table to find user by email
-      const { data: users, error: queryError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .limit(1);
+      // Call the PostgreSQL function to verify login
+      const { data, error: rpcError } = await supabase.rpc('verify_user_login', {
+        user_email: email,
+        user_password: password,
+      });
 
-      if (queryError) throw queryError;
+      if (rpcError) throw rpcError;
 
-      // Check if user exists
-      if (!users || users.length === 0) {
-        throw new Error('This email is not registered. Please check your email.');
+      // Check the response from the function
+      if (!data.success) {
+        throw new Error(data.error);
       }
 
-      const foundUser = users[0];
-
-      // Check password (assuming you store plain text or hashed)
-      // Note: For production, you should use proper password hashing
-      if (foundUser.password !== password) {
-        throw new Error('Invalid password. Please try again.');
-      }
-
-      // Check if user is admin
-      if (foundUser.role !== 'admin') {
-        throw new Error('This email is not registered as an admin. Access denied.');
-      }
-
-      // Create session user object (without password)
+      // Create session user object
       const sessionUser = {
-        id: foundUser.id,
-        email: foundUser.email,
-        name: foundUser.name || foundUser.full_name || foundUser.username || email,
-        role: foundUser.role,
+        id: data.user.id,
+        email: data.user.email,
+        name: `${data.user.first_name} ${data.user.last_name}`.trim() || email,
+        firstName: data.user.first_name,
+        lastName: data.user.last_name,
+        role: data.user.role,
       };
 
       // Save to session storage
