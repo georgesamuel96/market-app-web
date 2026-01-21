@@ -70,6 +70,7 @@ router.post('/register', async (req, res) => {
     const { data: newCustomer, error: insertError } = await supabase
       .from('customers')
       .insert({
+        name: `${first_name.trim()} ${last_name.trim()}`,
         email: email.toLowerCase(),
         password_hash: passwordHash,
         first_name: first_name.trim(),
