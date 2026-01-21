@@ -34,6 +34,11 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Hello endpoint
+app.get('/hello', (req, res) => {
+  res.json({ message: 'Hello by Claude code.' });
+});
+
 // API Routes
 app.use('/api/auth', authRoutes);
 
