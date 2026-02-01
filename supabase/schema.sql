@@ -36,6 +36,27 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Shops Table
+CREATE TABLE IF NOT EXISTS shops (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Shop Products Junction Table (Many-to-Many relationship)
+CREATE TABLE IF NOT EXISTS shop_products (
+  id BIGSERIAL PRIMARY KEY,
+  shop_id BIGINT NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  product_id BIGINT NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(shop_id, product_id)
+);
+
+-- Indexes for shop_products performance
+CREATE INDEX IF NOT EXISTS idx_shop_products_shop_id ON shop_products(shop_id);
+CREATE INDEX IF NOT EXISTS idx_shop_products_product_id ON shop_products(product_id);
+
 -- =============================================
 -- ROW LEVEL SECURITY (RLS) POLICIES
 -- Enable read/write access for authenticated and anonymous users
@@ -45,6 +66,8 @@ CREATE TABLE IF NOT EXISTS orders (
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shops ENABLE ROW LEVEL SECURITY;
+ALTER TABLE shop_products ENABLE ROW LEVEL SECURITY;
 
 -- Products policies (allow all operations for demo)
 CREATE POLICY "Allow all access to products" ON products
@@ -56,6 +79,14 @@ CREATE POLICY "Allow all access to customers" ON customers
 
 -- Orders policies
 CREATE POLICY "Allow all access to orders" ON orders
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- Shops policies
+CREATE POLICY "Allow all access to shops" ON shops
+  FOR ALL USING (true) WITH CHECK (true);
+
+-- Shop Products policies
+CREATE POLICY "Allow all access to shop_products" ON shop_products
   FOR ALL USING (true) WITH CHECK (true);
 
 -- =============================================
