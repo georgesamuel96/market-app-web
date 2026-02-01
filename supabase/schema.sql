@@ -36,10 +36,14 @@ CREATE TABLE IF NOT EXISTS orders (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Shops Table
+-- Shops Table (with authentication fields)
 CREATE TABLE IF NOT EXISTS shops (
   id BIGSERIAL PRIMARY KEY,
   name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  phone TEXT,
+  address TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
